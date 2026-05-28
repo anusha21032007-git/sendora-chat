@@ -1,3 +1,4 @@
+
 import "./App.css";
 import { useEffect, useState } from "react";
 
@@ -67,9 +68,14 @@ function App() {
   // AUTH STATE
 
   useEffect(() => {
-    onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        setUser(currentUser);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   // ADD CONTACT
@@ -91,6 +97,13 @@ function App() {
 
     if (!foundUser) {
       alert("User not found");
+      return;
+    }
+
+    // PREVENT SELF ADD
+
+    if (foundUser.uid === user.uid) {
+      alert("You cannot add yourself");
       return;
     }
 
@@ -116,7 +129,10 @@ function App() {
 
     const unsub = onSnapshot(q, (snapshot) => {
       const allContacts = snapshot.docs.map(
-        (doc) => doc.data()
+        (doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })
       );
 
       const myContacts = allContacts.filter(
@@ -205,10 +221,11 @@ function App() {
 
   return (
     <div className="app">
-      <h1 style={{ color: "red" }}>NEW VERSION</h1>
+
       {/* SIDEBAR */}
 
       <div className="sidebar">
+
         <div className="sidebar-top">
           <h1>Sendora</h1>
 
@@ -217,7 +234,7 @@ function App() {
           </button>
         </div>
 
-        {/* ADD EMAIL */}
+        {/* ADD CONTACT */}
 
         <div
           style={{
@@ -264,9 +281,9 @@ function App() {
         {/* CONTACTS */}
 
         <div className="chat-list">
-          {contacts.map((chat, index) => (
+          {contacts.map((chat) => (
             <div
-              key={index}
+              key={chat.id}
               className="chat-item"
               onClick={() =>
                 setSelectedChat(chat)
@@ -302,12 +319,16 @@ function App() {
       {/* CHAT WINDOW */}
 
       <div className="chat-window">
+
         {selectedChat ? (
           <>
+
             {/* HEADER */}
 
             <div className="chat-header">
+
               <div className="chat-user">
+
                 <button
                   onClick={() =>
                     setSelectedChat(null)
@@ -342,13 +363,17 @@ function App() {
 
                   <p>Online</p>
                 </div>
+
               </div>
+
             </div>
 
             {/* MESSAGES */}
 
             <div className="messages">
+
               {messages.map((msg, index) => (
+
                 <div
                   key={index}
                   className={`message ${
@@ -357,7 +382,9 @@ function App() {
                       : ""
                   }`}
                 >
+
                   <div className="message-user">
+
                     <img
                       src={msg.senderPhoto}
                       alt=""
@@ -366,16 +393,21 @@ function App() {
                     <h4>
                       {msg.senderName}
                     </h4>
+
                   </div>
 
                   <p>{msg.text}</p>
+
                 </div>
+
               ))}
+
             </div>
 
             {/* INPUT */}
 
             <div className="message-input">
+
               <input
                 type="text"
                 placeholder="Type message..."
@@ -393,14 +425,25 @@ function App() {
               >
                 Send
               </button>
+
             </div>
+
           </>
         ) : (
+
           <div className="empty-chat">
-            <h1>Add a contact to start chatting</h1>
+            <h1>
+              Add a contact to start chatting
+            </h1>
           </div>
+
         )}
+
       </div>
+
     </div>
   );
 }
+
+export default App;
+
