@@ -44,9 +44,18 @@ function App() {
   // ---- NEW: sidebar tab state ----
   const [sidebarTab, setSidebarTab] = useState("all"); // all | contacts | groups
 
+  // ---- LOGOUT FUNCTION ----
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
   // ... existing logic unchanged ...
 
-  // UI rendering (only sidebar part changed)
   return (
     <div className="app">
       {/* SIDEBAR */}
