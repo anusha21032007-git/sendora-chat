@@ -44,6 +44,8 @@ function App() {
   useState(false);
   const [blockedUsers, setBlockedUsers] =
   useState([]);
+  const [showProfileModal, setShowProfileModal] =
+  useState(false);
   
   // LOGIN
 
@@ -120,7 +122,9 @@ const addContact = async () => {
 
   setEmailInput("");
 };
+
 const deleteChat = async () => {
+  if (!selectedChat || !user) return;
   const confirmDelete =
     window.confirm(
       "Delete all messages in this chat?"
@@ -128,11 +132,31 @@ const deleteChat = async () => {
 
   if (!confirmDelete) return;
 
-  alert(
-    "Delete Chat backend will be added next"
-  );
+  try {
+    const q = query(collection(db, "messages"));
+    const snapshot = await getDocs(q);
+    const deletePromises = [];
+    snapshot.forEach((docSnap) => {
+      const msg = docSnap.data();
+      if (
+        (msg.sender === user.uid && msg.receiver === selectedChat.contactUid) ||
+        (msg.sender === selectedChat.contactUid && msg.receiver === user.uid)
+      ) {
+        deletePromises.push(deleteDoc(doc(db, "messages", docSnap.id)));
+      }
+    });
+    await Promise.all(deletePromises);
+    setMessages([]);
+    setShowMenu(false);
+    alert("Chat deleted successfully!");
+  } catch (error) {
+    console.error("Error deleting chat:", error);
+    alert("Failed to delete chat.");
+  }
 };
-const blockUser = () => {
+
+const blockUser = async () => {
+  if (!selectedChat || !user) return;
   const confirmBlock =
     window.confirm(
       "Block this user?"
@@ -140,8 +164,50 @@ const blockUser = () => {
 
   if (!confirmBlock) return;
 
-  alert("User blocked");
+  try {
+    await addDoc(collection(db, "blockedUsers"), {
+      blockerId: user.uid,
+      blockedId: selectedChat.contactUid,
+      createdAt: serverTimestamp(),
+    });
+    setSelectedChat(null);
+    setShowMenu(false);
+    alert("User blocked");
+  } catch (error) {
+    console.error("Error blocking user:", error);
+    alert("Failed to block user.");
+  }
 };
+
+const removeContact = async (contactId) => {
+  const confirmRemove = window.confirm("Remove this contact?");
+  if (!confirmRemove) return;
+  try {
+    await deleteDoc(doc(db, "contacts", contactId));
+    setSelectedChat(null);
+    setShowMenu(false);
+  } catch (error) {
+    console.error("Error removing contact:", error);
+  }
+};
+
+  // FETCH BLOCKED USERS
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, "blockedUsers"));
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setBlockedUsers(list);
+    });
+
+    return () => unsub();
+  }, [user]);
 
   // FETCH CONTACTS
 
