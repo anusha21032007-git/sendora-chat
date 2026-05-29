@@ -615,8 +615,8 @@ function App() {
                     <input
                       type="checkbox"
                       className="mr-2"
-                      checked={selectedMemberIds.includes(contact.uid)}
-                      onChange={() => toggleMember(contact.uid)}
+                      checked={selectedMemberIds.includes(contact.contactUid)}
+                      onChange={() => toggleMember(contact.contactUid)}
                     />
                     <span>{contact.contactName}</span>
                   </div>
