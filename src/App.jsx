@@ -12,6 +12,7 @@ import {
 import {
   collection,
   addDoc,
+  deleteDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -39,10 +40,14 @@ function App() {
 
   const [emailInput, setEmailInput] =
     useState("");
-
+    const [showMenu, setShowMenu] =
+  useState(false);
+  const [blockedUsers, setBlockedUsers] =
+  useState([]);
+  
   // LOGIN
 
-  const login = async () => {
+  async function login() {
     const result = await signInWithPopup(
       auth,
       provider
@@ -57,7 +62,7 @@ function App() {
         photo: result.user.photoURL,
       }
     );
-  };
+  }
 
   // LOGOUT
 
@@ -80,45 +85,63 @@ function App() {
 
   // ADD CONTACT
 
-  const addContact = async () => {
-    if (!emailInput.trim()) return;
+const addContact = async () => {
+  if (!emailInput.trim()) return;
 
-    const snapshot = await getDocs(
-      collection(db, "users")
+  const snapshot = await getDocs(
+    collection(db, "users")
+  );
+
+  const foundUser = snapshot.docs
+    .map((doc) => doc.data())
+    .find(
+      (u) =>
+        u.email.toLowerCase() ===
+        emailInput.toLowerCase()
     );
 
-    const foundUser = snapshot.docs
-      .map((doc) => doc.data())
-      .find(
-        (u) =>
-          u.email.toLowerCase() ===
-          emailInput.toLowerCase()
-      );
+  if (!foundUser) {
+    alert("User not found");
+    return;
+  }
 
-    if (!foundUser) {
-      alert("User not found");
-      return;
-    }
+  if (foundUser.uid === user.uid) {
+    alert("You cannot add yourself");
+    return;
+  }
 
-    // PREVENT SELF ADD
+  await addDoc(collection(db, "contacts"), {
+    owner: user.uid,
+    contactUid: foundUser.uid,
+    contactName: foundUser.name,
+    contactEmail: foundUser.email,
+    contactPhoto: foundUser.photo,
+  });
 
-    if (foundUser.uid === user.uid) {
-      alert("You cannot add yourself");
-      return;
-    }
+  setEmailInput("");
+};
+const deleteChat = async () => {
+  const confirmDelete =
+    window.confirm(
+      "Delete all messages in this chat?"
+    );
 
-    // SAVE CONTACT
+  if (!confirmDelete) return;
 
-    await addDoc(collection(db, "contacts"), {
-      owner: user.uid,
-      contactUid: foundUser.uid,
-      contactName: foundUser.name,
-      contactEmail: foundUser.email,
-      contactPhoto: foundUser.photo,
-    });
+  alert(
+    "Delete Chat backend will be added next"
+  );
+};
+const blockUser = () => {
+  const confirmBlock =
+    window.confirm(
+      "Block this user?"
+    );
 
-    setEmailInput("");
-  };
+  if (!confirmBlock) return;
+
+  alert("User blocked");
+};
 
   // FETCH CONTACTS
 
@@ -135,15 +158,22 @@ function App() {
         })
       );
 
-      const myContacts = allContacts.filter(
-        (c) => c.owner === user.uid
-      );
+      const myContacts =
+  snapshot.docs
+    .map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }))
+    .filter(
+      (c) => c.owner === user.uid
+    );
 
       setContacts(myContacts);
     });
 
     return () => unsub();
   }, [user]);
+  
 
   // FETCH MESSAGES
 
@@ -193,13 +223,14 @@ function App() {
     setMessage("");
   };
 
+
   // ENTER KEY
 
-  const handleKeyDown = (e) => {
+  function handleKeyDown(e) {
     if (e.key === "Enter") {
       sendMessage();
     }
-  };
+  }
 
   // LOGIN SCREEN
 
@@ -277,6 +308,7 @@ function App() {
             Add Contact
           </button>
         </div>
+        
 
         {/* CONTACTS */}
 
@@ -354,15 +386,88 @@ function App() {
                   alt=""
                 />
 
-                <div>
-                  <h2>
-                    {
-                      selectedChat.contactName
-                    }
-                  </h2>
+                <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+  }}
+>
+  <div>
+    <h2>
+      {selectedChat.contactName}
+    </h2>
 
-                  <p>Online</p>
-                </div>
+    <p>Online</p>
+  </div>
+
+  <div
+    style={{
+      position: "relative",
+    }}
+  >
+    <button
+      onClick={() =>
+        setShowMenu(!showMenu)
+      }
+      style={{
+        background: "transparent",
+        border: "none",
+        color: "white",
+        fontSize: "24px",
+        cursor: "pointer",
+      }}
+    >
+      ⋮
+    </button>
+
+    {showMenu && (
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          top: "35px",
+          background: "#162433",
+          borderRadius: "10px",
+          minWidth: "170px",
+          overflow: "hidden",
+        }}
+      >
+        <div
+  className="menu-item"
+  onClick={() => {
+    alert(
+      `Name: ${selectedChat.contactName}
+Email: ${selectedChat.contactEmail}`
+    );
+  }}
+>
+  View Profile
+</div>
+
+        <div className="menu-item">
+          Delete Chat
+        </div>
+
+        <div
+          className="menu-item"
+          onClick={() =>
+            removeContact(
+              selectedChat.id
+            )
+          }
+        >
+          Remove Contact
+        </div>
+
+        <div className="menu-item">
+          Block User
+        </div>
+      </div>
+    )}
+  </div>
+</div>
 
               </div>
 
