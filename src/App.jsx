@@ -275,22 +275,22 @@ function App() {
     setAiLoading(true);
     setAiError(false);
     try {
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) throw new Error("API key missing");
       const response = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "meta-llama/Meta-Llama-3.1-70B-Instruct", // you can change the model as needed
-            messages: [
+            contents: [
               {
                 role: "user",
-                content: `Generate exactly three short reply suggestions (no punctuation) for the following message: "${incomingText}". Return them as a JSON array of strings.`,
+                parts: [
+                  {
+                    text: `Generate exactly three short reply suggestions (no punctuation) for the following message: "${incomingText}". Return them as a JSON array of strings.`,
+                  },
+                ],
               },
             ],
           }),
