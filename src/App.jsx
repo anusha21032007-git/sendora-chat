@@ -43,10 +43,11 @@ function App() {
   // -------- NEW STATE FOR GROUPS ----------
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [groups, setGroups] = useState([]);
-  const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [groupMessage, setGroupMessage] = useState("");
+  const [groupMessages, setGroupMessages] = useState([]);
 
   // LOGIN
   async function login() {
@@ -183,7 +184,6 @@ function App() {
         members: [...selectedMemberIds, user.uid],
         createdAt: serverTimestamp(),
       });
-      setCreatingGroup(false);
       setGroupModalOpen(false);
       setGroupName("");
       setSelectedMemberIds([]);
@@ -218,10 +218,6 @@ function App() {
     if (!user) return;
     const q = query(collection(db, "contacts"));
     const unsub = onSnapshot(q, (snapshot) => {
-      const allContacts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
       const myContacts = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
         .filter((c) => c.owner === user.uid);
@@ -230,7 +226,7 @@ function App() {
     return () => unsub();
   }, [user]);
 
-  // -------- NEW: FETCH GROUPS ----------
+  // FETCH GROUPS
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "groups"));
@@ -244,13 +240,10 @@ function App() {
     return () => unsub();
   }, [user]);
 
-  // FETCH MESSAGES
+  // FETCH PRIVATE MESSAGES
   useEffect(() => {
     if (!selectedChat || !user) return;
-    const q = query(
-      collection(db, "messages"),
-      orderBy("createdAt")
-    );
+    const q = query(collection(db, "messages"), orderBy("createdAt"));
     const unsub = onSnapshot(q, (snapshot) => {
       const allMessages = snapshot.docs.map((doc) => doc.data());
       const filtered = allMessages.filter(
@@ -263,7 +256,23 @@ function App() {
     return () => unsub();
   }, [selectedChat, user]);
 
-  // SEND MESSAGE
+  // FETCH GROUP MESSAGES
+  useEffect(() => {
+    if (!selectedGroup || !user) return;
+    const q = query(
+      collection(db, "groupMessages"),
+      orderBy("createdAt")
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const all = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((msg) => msg.groupId === selectedGroup.id);
+      setGroupMessages(all);
+    });
+    return () => unsub();
+  }, [selectedGroup, user]);
+
+  // SEND PRIVATE MESSAGE
   const sendMessage = async () => {
     if (!message.trim()) return;
     await addDoc(collection(db, "messages"), {
@@ -277,10 +286,25 @@ function App() {
     setMessage("");
   };
 
-  // ENTER KEY
+  // SEND GROUP MESSAGE
+  const sendGroupMessage = async () => {
+    if (!groupMessage.trim() || !selectedGroup) return;
+    await addDoc(collection(db, "groupMessages"), {
+      text: groupMessage,
+      sender: user.uid,
+      groupId: selectedGroup.id,
+      senderName: user.displayName,
+      senderPhoto: user.photoURL,
+      createdAt: serverTimestamp(),
+    });
+    setGroupMessage("");
+  };
+
+  // ENTER KEY HANDLER
   function handleKeyDown(e) {
     if (e.key === "Enter") {
-      sendMessage();
+      if (selectedChat) sendMessage();
+      else if (selectedGroup) sendGroupMessage();
     }
   }
 
@@ -356,17 +380,18 @@ function App() {
             borderRadius: "12px",
             color: "white",
             cursor: "pointer",
+            marginTop: "10px",
           }}
         >
           Create Group
         </button>
 
-        {/* CONTACTS */}
+        {/* CONTACTS LIST */}
         <div className="chat-list">
           {contacts.map((chat) => (
             <div
               key={chat.id}
-              className="chat-item"
+              className={`chat-item ${selectedChat?.id === chat.id ? "bg-blue-600 text-white" : ""}`}
               onClick={() => setSelectedChat(chat)}
             >
               <img src={chat.contactPhoto} alt="" />
@@ -379,7 +404,7 @@ function App() {
         </div>
 
         {/* GROUPS LIST */}
-        <div className="groups-list">
+        <div className="groups-list" style={{ marginTop: "20px" }}>
           <h3 className="text-sm font-medium text-gray-300 mb-1">Groups</h3>
           {groups.map((group) => (
             <div
@@ -402,11 +427,11 @@ function App() {
         </div>
       </div>
 
-      {/* CHAT WINDOW */}
+      {/* MAIN CHAT WINDOW */}
       <div className="chat-window">
-        {selectedChat ? (
+        {/* PRIVATE CHAT */}
+        {selectedChat && (
           <>
-            {/* HEADER */}
             <div className="chat-header">
               <div className="chat-user">
                 <button
@@ -437,9 +462,7 @@ function App() {
                     <h2>{selectedChat.contactName}</h2>
                     <p>Online</p>
                   </div>
-                  <div
-                    style={{ position: "relative" }}
-                  >
+                  <div style={{ position: "relative" }}>
                     <button
                       onClick={() => setShowMenu(!showMenu)}
                       style={{
@@ -467,10 +490,7 @@ function App() {
                         <div
                           className="menu-item"
                           onClick={() => {
-                            alert(
-                              `Name: ${selectedChat.contactName}
-Email: ${selectedChat.contactEmail}`
-                            );
+                            alert(`Name: ${selectedChat.contactName}\nEmail: ${selectedChat.contactEmail}`);
                           }}
                         >
                           View Profile
@@ -489,8 +509,6 @@ Email: ${selectedChat.contactEmail}`
                 </div>
               </div>
             </div>
-
-            {/* MESSAGES */}
             <div className="messages">
               {messages.map((msg, index) => (
                 <div
@@ -505,8 +523,6 @@ Email: ${selectedChat.contactEmail}`
                 </div>
               ))}
             </div>
-
-            {/* INPUT */}
             <div className="message-input">
               <input
                 type="text"
@@ -518,14 +534,70 @@ Email: ${selectedChat.contactEmail}`
               <button onClick={sendMessage}>Send</button>
             </div>
           </>
-        ) : (
+        )}
+
+        {/* GROUP CHAT */}
+        {selectedGroup && (
+          <>
+            <div className="chat-header">
+              <div className="chat-user">
+                <button
+                  onClick={() => setSelectedGroup(null)}
+                  style={{
+                    background: "#2563eb",
+                    border: "none",
+                    color: "white",
+                    width: "45px",
+                    height: "45px",
+                    borderRadius: "50%",
+                    fontSize: "22px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ←
+                </button>
+                <div style={{ marginLeft: "10px" }}>
+                  <h2>{selectedGroup.name}</h2>
+                  <p>Group Chat</p>
+                </div>
+              </div>
+            </div>
+            <div className="messages">
+              {groupMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`message ${msg.sender === user.uid ? "own" : ""}`}
+                >
+                  <div className="message-user">
+                    <img src={msg.senderPhoto} alt="" />
+                    <h4>{msg.senderName}</h4>
+                  </div>
+                  <p>{msg.text}</p>
+                </div>
+              ))}
+            </div>
+            <div className="message-input">
+              <input
+                type="text"
+                placeholder="Type group message..."
+                value={groupMessage}
+                onChange={(e) => setGroupMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+              <button onClick={sendGroupMessage}>Send</button>
+            </div>
+          </>
+        )}
+
+        {/* EMPTY STATE */}
+        {!selectedChat && !selectedGroup && (
           <div className="empty-chat">
-            <h1>Add a contact to start chatting</h1>
+            <h1>Add a contact or select a group to start chatting</h1>
           </div>
         )}
 
         {/* GROUP CREATION MODAL */}
-        {creatingGroup && (
+        {groupModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
               <h2 className="text-lg font-semibold mb-4">Create Group</h2>
