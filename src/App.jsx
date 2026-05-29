@@ -54,6 +54,24 @@ function App() {
     }
   };
 
+  // ---- ADD CONTACT FUNCTION (stub) ----
+  const addContact = async () => {
+    if (!emailInput) return;
+    try {
+      // Simple stub: add a dummy contact to local state.
+      const newContact = {
+        id: Date.now().toString(),
+        contactEmail: emailInput,
+        contactName: emailInput.split("@")[0],
+        contactPhoto: "", // placeholder
+      };
+      setContacts((prev) => [...prev, newContact]);
+      setEmailInput("");
+    } catch (err) {
+      console.error("Add contact failed:", err);
+    }
+  };
+
   // ... existing logic unchanged ...
 
   return (
