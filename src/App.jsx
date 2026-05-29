@@ -164,6 +164,13 @@ const blockUser = async () => {
 
   if (!confirmBlock) return;
 
+  // Check if user is already blocked
+  const isAlreadyBlocked = blockedUsers.some(u => u.blockedId === selectedChat.contactUid);
+  if (isAlreadyBlocked) {
+    alert("User is already blocked");
+    return;
+  }
+
   try {
     await addDoc(collection(db, "blockedUsers"), {
       blockerId: user.uid,
@@ -485,7 +492,7 @@ const removeContact = async (contactId) => {
         cursor: "pointer",
       }}
     >
-      ⋮
+      •
     </button>
 
     {showMenu && (
@@ -611,7 +618,6 @@ Email: ${selectedChat.contactEmail}`
         )}
 
       </div>
-
     </div>
   );
 }
