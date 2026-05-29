@@ -178,10 +178,12 @@ function App() {
   const createGroup = async () => {
     if (!groupName.trim() || selectedMemberIds.length === 0) return;
     try {
+      // Ensure no undefined values in members array
+      const members = [...selectedMemberIds.filter(Boolean), user.uid];
       await addDoc(collection(db, "groups"), {
         name: groupName.trim(),
         createdBy: user.uid,
-        members: [...selectedMemberIds, user.uid],
+        members,
         createdAt: serverTimestamp(),
       });
       setGroupModalOpen(false);
