@@ -34,6 +34,10 @@ function App() {
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  // ---- AI Smart Reply state ----
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
 
   const [emailInput, setEmailInput] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -254,9 +258,58 @@ function App() {
           (msg.sender === selectedChat.contactUid && msg.receiver === user.uid)
       );
       setMessages(filtered);
+      // ---- AI Smart Reply trigger ----
+      const latestIncoming = filtered
+        .filter((m) => m.sender !== user.uid)
+        .sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds)[0];
+      if (latestIncoming) {
+        generateAiSuggestions(latestIncoming.text);
+      }
     });
     return () => unsub();
   }, [selectedChat, user]);
+
+  // ---- AI Smart Reply functions ----
+  const generateAiSuggestions = async (incomingText) => {
+    if (!incomingText) return;
+    setAiLoading(true);
+    setAiError(false);
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API key missing");
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: `Generate exactly three short reply suggestions (no punctuation) for the following message: "${incomingText}". Return them as a JSON array of strings.`,
+                  },
+                ],
+              },
+            ],
+          }),
+        }
+      );
+      const data = await response.json();
+      const suggestionText =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      // Expecting something like ["Yes, I'm available","Not sure yet","I'll let you know"]
+      const parsed = JSON.parse(suggestionText);
+      setAiSuggestions(Array.isArray(parsed) ? parsed.slice(0, 3) : []);
+    } catch (e) {
+      console.error("AI suggestion error:", e);
+      setAiError(true);
+      setAiSuggestions([]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // FETCH GROUP MESSAGES
   useEffect(() => {
@@ -525,6 +578,26 @@ function App() {
                 </div>
               ))}
             </div>
+            {/* AI Smart Reply suggestions */}
+            {aiLoading && (
+              <div className="p-2 text-sm text-gray-400">Generating suggestions...</div>
+            )}
+            {aiError && (
+              <div className="p-2 text-sm text-red-400">AI suggestions unavailable</div>
+            )}
+            {aiSuggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-2">
+                {aiSuggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    className="px-3 py-1 bg-gray-700 rounded-full text-sm hover:bg-gray-600"
+                    onClick={() => setMessage(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="message-input">
               <input
                 type="text"
